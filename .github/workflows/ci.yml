@@ -1,0 +1,72 @@
+name: Build and Push Docker Image
+
+# Trigger the workflow on every push to the "main" branch
+on:
+  push:
+    branches: [ "main" ]
+
+# Define environment variables
+env:
+  REGISTRY: ghcr.io
+  # github.repository will automatically convert to "your-username/your-repo-name"
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest # You can use your local runner later, but github-hosted is easier for test
+    
+    # Permissions required to write to GitHub Packages
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # Step 1: Check out the code from the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python environment to run tests
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-node-version: '3.11'
+
+      # Step 3: Install dependencies and run tests (Simple smoke test)
+      - name: Install dependencies and test
+        run: |
+          pip install -r requirements.txt
+          # Run a quick check that the code syntax is correct
+          python -m py_compile main.py
+
+      # Step 4: Set up Docker Buildx (advanced building tool)
+      - name: Set up Docker Buildx
+        uses: actions/tools/github-actions/setup-buildx-action@v3
+
+      # Step 5: Log in to GitHub Container Registry (GHCR)
+      # GitHub automatically provides the GITHUB_TOKEN secret, no need to configure it manually
+      - name: Log in to the Container registry
+        uses: actions/tools/github-actions/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 6: Extract metadata (tags, labels) for Docker
+      - name: Extract Docker metadata
+        id: meta
+        uses: actions/tools/github-actions/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Tags the image with the git commit SHA and "latest"
+          tags: |
+            type=sha,format=short
+            type=raw,value=latest
+
+      # Step 7: Build the Docker image and push it to GHCR
+      - name: Build and push Docker image
+        uses: actions/tools/github-actions/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
