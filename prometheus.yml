@@ -1,0 +1,12 @@
+global:
+  # How frequently to scrape targets by default
+  scrape_interval: 5s 
+
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config
+  - job_name: "fastapi-app"
+    
+    static_configs:
+      # 'fastapi_app' corresponds to the service name defined in the docker-compose.yml file
+      - targets: ["fastapi_app:8000"] 
+
